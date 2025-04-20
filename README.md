@@ -2,7 +2,8 @@
 A command line CAT control for FLEX radios
 
 
-Welcome to Flexy CAT - Serial CAT
+Welcome to Flexy CAT - A serial CAT controller for Flex 
+
     by the Alan Gordon Group
            v1.0
 
@@ -86,4 +87,15 @@ SSB-10:ZZFA00028500000;ZZFI04;ZZGT3;ZZMD01;ZZMG049;ZZRG+00000;ZZRT0;ZZXG+00000;
 SSB-40:ZZFA00007200000;ZZFI04;ZZGT3;ZZMD01;ZZMG049;ZZRG+00000;ZZRT0;ZZXG+00000;
 SSB-20:ZZFA00014250000;ZZFI04;ZZGT3;ZZMD01;ZZMG049;ZZRG+00000;ZZRT0;ZZXG+00000;
 
+```
+
+--------------------------------------
+Example use of saved data
+
+```
+flexycat.exe SET:SSB-10
+
+or 
+
+flexycat.exe CONFIG{PORT=COM8,BAUD=9600}:SET:SSB-10
 ```
