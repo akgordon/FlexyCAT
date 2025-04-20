@@ -9,7 +9,9 @@ import (
 	"strings"
 )
 
-var savedData map[string]string
+type savedData struct {
+	savedData map[string]string
+}
 
 func main() {
 
@@ -51,6 +53,11 @@ func main() {
 
 	flds := strings.FieldsFunc(args[1], splitColon)
 
+	var theSavedData = &savedData{}
+	theSavedData.savedData = make(map[string]string)
+
+	//var savedData = make(map[string]string)
+
 	// First check to see if port and baud in command line
 	var commport = ""
 	var baudrate = 0
@@ -91,7 +98,7 @@ func main() {
 		if (cmd == "GET") || (cmd == "SET") {
 			// First get ANY saved info
 			// Get any saved data
-			savedData, err = getSavedData("saved.txt")
+			err = theSavedData.getSavedData("saved.txt")
 			if err != nil {
 				fmt.Print(err.Error())
 				os.Exit(1)
@@ -101,28 +108,28 @@ func main() {
 		if cmd == "CAT" {
 			// Run command
 			if len(flds) > (idx + 1) {
-				doCAT(commport, baudrate, flds[idx+1])
+				DoCAT(commport, baudrate, flds[idx+1])
 			}
 		}
 
 		if cmd == "GET" {
 			// Run command
 			if len(flds) > (idx + 2) {
-				doGET(commport, baudrate, flds[idx+1], flds[idx+2])
+				theSavedData.DoGET(commport, baudrate, flds[idx+1], flds[idx+2])
 			}
 		}
 
 		if cmd == "SET" {
 			// Run command
 			if len(flds) > (idx + 1) {
-				doSET(commport, baudrate, flds[idx+1])
+				theSavedData.DoSET(commport, baudrate, flds[idx+1])
 			}
 		}
 
 		if (cmd == "GET") || (cmd == "SET") {
 			// First get ANY saved info
 			// Get any saved data
-			err = setSavedData("saved.txt", savedData)
+			err = theSavedData.setSavedData("saved.txt")
 			if err != nil {
 				fmt.Print(err.Error())
 				os.Exit(1)
@@ -167,21 +174,24 @@ func getConfig(filename string) (commport string, baud int) {
 	return cport, baudrate
 }
 
-func getSavedData(filename string) (map[string]string, error) {
+func (sd *savedData) getSavedData(filename string) error {
 
-	var storedCmds map[string]string
+	// Clear any current map data
+	for key := range sd.savedData {
+		delete(sd.savedData, key)
+	}
 
 	// See if file exists
 	_, err := os.Stat(filename)
 	if os.IsNotExist(err) {
-		return storedCmds, nil
+		return nil
 	}
 
 	// Open file
 	var filePtr *os.File
 	filePtr, err = os.Open(filename)
 	if err != nil {
-		return storedCmds, err
+		return err
 	}
 	defer filePtr.Close()
 
@@ -192,14 +202,14 @@ func getSavedData(filename string) (map[string]string, error) {
 		ln := scanner.Text()
 		flds := strings.FieldsFunc(ln, splitColon)
 		if len(flds) == 2 {
-			storedCmds[strings.TrimSpace(flds[0])] = strings.TrimSpace(flds[1])
+			sd.savedData[strings.TrimSpace(flds[0])] = strings.TrimSpace(flds[1])
 		}
 	}
 
-	return storedCmds, nil
+	return nil
 }
 
-func setSavedData(filename string, data map[string]string) error {
+func (sd *savedData) setSavedData(filename string) error {
 
 	// Open file for writing
 	var filePtr *os.File
@@ -211,7 +221,7 @@ func setSavedData(filename string, data map[string]string) error {
 	}
 	defer filePtr.Close()
 
-	for key, val := range data {
+	for key, val := range sd.savedData {
 		filePtr.WriteString(key + ":" + val + "\n")
 	}
 
@@ -231,8 +241,8 @@ func splitComma(r rune) bool {
 	return r == ','
 }
 
-func doCAT(commport string, baudrate int, cmd string) {
-	flds := strings.FieldsFunc(cmd, splitColon)
+func DoCAT(commport string, baudrate int, cmd string) {
+	flds := strings.FieldsFunc(cmd, splitSemiColon)
 	for _, v := range flds {
 		v = v + ";"
 		fmt.Printf("%s\n", v)
@@ -240,27 +250,26 @@ func doCAT(commport string, baudrate int, cmd string) {
 	}
 }
 
-func doGET(commport string, baudrate int, id string, cmd string) {
+func (sd *savedData) DoGET(commport string, baudrate int, key string, cmd string) {
 	var responses string = ""
 	flds := strings.FieldsFunc(cmd, splitSemiColon)
 	for _, v := range flds {
 		v = v + ";"
-		agg_serial_com.SerialComm_Write(commport, baudrate, []byte(v))
-		data, _, err := agg_serial_com.SerialComm_Read(commport, baudrate)
+		resp, err := agg_serial_com.SerialDataSendAndReceive(commport, baudrate, v)
+
 		if err == nil {
-			resp := string(data)
-			responses += resp + ";"
+			responses += resp
 		} else {
 			fmt.Print(err.Error())
 		}
 	}
-	savedData[id] = responses
+	sd.savedData[key] = responses
 }
 
-func doSET(commport string, baudrate int, id string) {
-	cmd, ok := savedData[id]
+func (sd *savedData) DoSET(commport string, baudrate int, id string) {
+	cmd, ok := sd.savedData[id]
 	if ok {
-		doCAT(commport, baudrate, cmd)
+		DoCAT(commport, baudrate, cmd)
 	} else {
 		fmt.Printf("No saved command named:%s", id)
 	}
