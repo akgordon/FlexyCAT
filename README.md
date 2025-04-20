@@ -37,6 +37,11 @@ Edit the config.ini file for port and baud rate
   Example:
      CONFIG{PORT=COM8,BAUD=9600}:CAT:ZZMD03;ZZFA00014054350;
 
+Example config.ini file:
+```
+port: COM8
+baud: 9600
+```
 
 Commands:
 
