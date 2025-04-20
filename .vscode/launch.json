@@ -21,6 +21,15 @@
          "args":["CAT:ZZFA;ZZMD;"]
       },
       {
+         "name": "FlexyCAT test CAT with inline config",
+         "type": "go",
+         "request": "launch",
+         "mode": "debug",
+         "program": "${workspaceFolder}/cmd/flexSerialCat/main.go",
+         "console": "integratedTerminal",
+         "args":["CONFIG{PORT=COM8,BAUD=9600}:CAT:ZZFA;ZZMD;"]
+      },
+      {
          "name": "FlexyCAT test GET",
          "type": "go",
          "request": "launch",

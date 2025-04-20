@@ -1,0 +1,1 @@
+..\build\flexycat.exe GET:SSB-10:ZZFA;ZZFI;ZZGT;ZZMD;ZZMG;ZZRG;ZZRT;ZZXG

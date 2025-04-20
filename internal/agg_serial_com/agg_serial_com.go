@@ -73,7 +73,7 @@ func SerialDataSendAndReceive(portName string, baudRate int, dataToSend string) 
 		return "", fmt.Errorf("failed to send data: %v", err)
 	}
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Millisecond * 250)
 
 	// Wait for and read the response
 	buffer := make([]byte, 1024) // Adjust buffer size as needed

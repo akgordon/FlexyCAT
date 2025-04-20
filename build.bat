@@ -1,0 +1,1 @@
+ go build -o build/flexycat.exe cmd/flexSerialCat/main.go
