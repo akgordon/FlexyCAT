@@ -12,13 +12,31 @@
          "program": "${file}"
       },
       {
-         "name": "LaunchFlex Serial",
+         "name": "FlexyCAT test CAT",
          "type": "go",
          "request": "launch",
          "mode": "debug",
          "program": "${workspaceFolder}/cmd/flexSerialCat/main.go",
          "console": "integratedTerminal",
          "args":["CAT;ZZFA;ZZMD;"]
-      }              
+      },
+      {
+         "name": "FlexyCAT test GET",
+         "type": "go",
+         "request": "launch",
+         "mode": "debug",
+         "program": "${workspaceFolder}/cmd/flexSerialCat/main.go",
+         "console": "integratedTerminal",
+         "args":["GET;VFOA;ZZFA;ZZMD;"]
+      },
+      {
+         "name": "FlexyCAT test SET",
+         "type": "go",
+         "request": "launch",
+         "mode": "debug",
+         "program": "${workspaceFolder}/cmd/flexSerialCat/main.go",
+         "console": "integratedTerminal",
+         "args":["SET;VFOA"]
+      }                            
    ]
 }

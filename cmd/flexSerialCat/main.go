@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var savedData map[string]string
+
 func main() {
 
 	args := os.Args
@@ -18,51 +20,114 @@ func main() {
 		fmt.Print("           v1.0\n")
 		fmt.Print("\n")
 		fmt.Print("Edit the config.ini file for port and baud rate\n")
+		fmt.Print("  or preface each command with 'CONFIG{PORT=COM8,BAUD=9600}'\n")
+		fmt.Print("  Example:\n")
+		fmt.Print("     CONFIG{PORT=COM8,BAUD=9600}:CAT:ZZMD03;ZZFA00014054350;\n")
 		fmt.Print("\n")
 		fmt.Print("\n")
 		fmt.Print("Commands:\n")
 		fmt.Print("\n")
-		fmt.Print("  CAT;ZZxx  send CAT command to radio. Can be string together using semi-colon separator\n")
+		fmt.Print("  CAT:ZZxx  send CAT command to radio. Can be string together using semi-colon separator\n")
+		fmt.Print("     Note use of colon and semi-colon in command string. \n")
 		fmt.Print("  Example:\n")
-		fmt.Print("     CAT;ZZMD03;ZZFA00014054350;\n")
+		fmt.Print("     CAT:ZZMD03;ZZFA00014054350;\n")
 		fmt.Print("\n")
 		fmt.Print("  GET   to get response from radio and save for later send back to radio\n")
 		fmt.Print("  SET   send stored data to radio\n")
 		fmt.Print("\n")
 		fmt.Print("     Responses are saved by id number later to send command\n")
-		fmt.Print("     xx = id number used for later SET\n")
+		fmt.Print("     xxs = a string id used for later SET.\n")
 		fmt.Print("     cmd = CAT command. e.g ZZFA;  Can string commands and save under one ID. \n")
-		fmt.Print("  GET:xx:cmd1:cmd2:....\n")
+		fmt.Print("     Note use of colon and semi-colon in command string. \n")
 		fmt.Print("\n")
-		fmt.Print("Example to get current VFO-A settings\n")
-		fmt.Print("   GET;01;ZZFA;ZZFI;ZZGT;ZZMD;ZZMG;ZZRG;ZZRT;ZZXG;\n")
+		fmt.Print("Example to GET current VFO-A settings\n")
+		fmt.Print("   GET:VFOA:ZZFA;ZZFI;ZZGT;ZZMD;ZZMG;ZZRG;ZZRT;ZZXG;\n")
 		fmt.Print("\n")
 		fmt.Print("Example to send saved data to radio\n")
-		fmt.Print("   SET;01\n")
+		fmt.Print("   SET:VFOA\n")
 		fmt.Print("\n")
 		os.Exit(0)
 	}
 
-	// Get port info
-	commport, baudrate := getConfig("config.ini")
+	flds := strings.FieldsFunc(args[1], splitColon)
+
+	// First check to see if port and baud in command line
+	var commport = ""
+	var baudrate = 0
+	for _, v := range flds {
+		if strings.Index(v, "CONFIG") == 0 {
+			// CONFIG{PORT=COM8,BAUD=9600}
+			v = v[7 : len(v)-1]
+			cfgFlds := strings.FieldsFunc(v, splitComma)
+			for _, c := range cfgFlds {
+				if strings.Index(c, "PORT=") == 0 {
+					commport = c[5:]
+					commport = strings.TrimSpace(commport)
+				}
+				if strings.Index(c, "BAUD=") == 0 {
+					bs := c[5:]
+					bs = strings.TrimSpace(bs)
+					baudrate, _ = strconv.Atoi(bs)
+				}
+			}
+		}
+	}
+	if baudrate == 0 {
+		// Get port info
+		commport, baudrate = getConfig("config.ini")
+	}
+	if baudrate == 0 {
+		fmt.Print("ERROR: Unable to get port and baud rate.")
+		os.Exit(1)
+	}
 	fmt.Printf("Using port:%s  with baud rate:%d\n", commport, baudrate)
 
-	// Get any saved data
-	savedData, err := getSavedData("saved.txt")
-	if err != nil {
-		fmt.Print(err.Error())
-		os.Exit(1)
-	}
+	//******************
+	// Process command
+	//******************
+	var err error
 
-	// Run command
-	if strings.Index(args[1], "CAT") == 0 {
-		doCAT(args[1], commport, baudrate)
-	}
+	for idx, cmd := range flds {
+		if (cmd == "GET") || (cmd == "SET") {
+			// First get ANY saved info
+			// Get any saved data
+			savedData, err = getSavedData("saved.txt")
+			if err != nil {
+				fmt.Print(err.Error())
+				os.Exit(1)
+			}
+		}
 
-	err = setSavedData("saved.txt", savedData)
-	if err != nil {
-		fmt.Print(err.Error())
-		os.Exit(1)
+		if cmd == "CAT" {
+			// Run command
+			if len(flds) > (idx + 1) {
+				doCAT(commport, baudrate, flds[idx+1])
+			}
+		}
+
+		if cmd == "GET" {
+			// Run command
+			if len(flds) > (idx + 2) {
+				doGET(commport, baudrate, flds[idx+1], flds[idx+2])
+			}
+		}
+
+		if cmd == "SET" {
+			// Run command
+			if len(flds) > (idx + 1) {
+				doSET(commport, baudrate, flds[idx+1])
+			}
+		}
+
+		if (cmd == "GET") || (cmd == "SET") {
+			// First get ANY saved info
+			// Get any saved data
+			err = setSavedData("saved.txt", savedData)
+			if err != nil {
+				fmt.Print(err.Error())
+				os.Exit(1)
+			}
+		}
 	}
 }
 
@@ -102,9 +167,9 @@ func getConfig(filename string) (commport string, baud int) {
 	return cport, baudrate
 }
 
-func getSavedData(filename string) (map[int]string, error) {
+func getSavedData(filename string) (map[string]string, error) {
 
-	var storedCmds map[int]string
+	var storedCmds map[string]string
 
 	// See if file exists
 	_, err := os.Stat(filename)
@@ -122,25 +187,19 @@ func getSavedData(filename string) (map[int]string, error) {
 
 	// Read in data
 	// Format:  xxx:<data>
-
 	scanner := bufio.NewScanner(filePtr)
 	for scanner.Scan() {
 		ln := scanner.Text()
-
-		ids := ln[:3]
-		id, err := strconv.Atoi(ids)
-		if err != nil {
-			continue
+		flds := strings.FieldsFunc(ln, splitColon)
+		if len(flds) == 2 {
+			storedCmds[strings.TrimSpace(flds[0])] = strings.TrimSpace(flds[1])
 		}
-
-		trimedData := strings.TrimSpace(ln[4:])
-		storedCmds[id] = trimedData
 	}
 
 	return storedCmds, nil
 }
 
-func setSavedData(filename string, data map[int]string) error {
+func setSavedData(filename string, data map[string]string) error {
 
 	// Open file for writing
 	var filePtr *os.File
@@ -153,28 +212,56 @@ func setSavedData(filename string, data map[int]string) error {
 	defer filePtr.Close()
 
 	for key, val := range data {
-		ids := fmt.Sprintf("%03d", key)
-		filePtr.WriteString(ids + ":" + val + "\n")
+		filePtr.WriteString(key + ":" + val + "\n")
 	}
 
 	return nil
 }
 
-func split(r rune) bool {
+func splitColon(r rune) bool {
+	return r == ':'
+}
+func splitSemiColon(r rune) bool {
 	return r == ';'
 }
+func splitEqual(r rune) bool {
+	return r == '='
+}
+func splitComma(r rune) bool {
+	return r == ','
+}
 
-func doCAT(cmd string, commport string, baudrate int) {
-	flds := strings.FieldsFunc(cmd, split)
-	isFirst := true
+func doCAT(commport string, baudrate int, cmd string) {
+	flds := strings.FieldsFunc(cmd, splitColon)
 	for _, v := range flds {
-		if isFirst {
-			isFirst = false
-			continue
+		v = v + ";"
+		fmt.Printf("%s\n", v)
+		agg_serial_com.SerialComm_Write(commport, baudrate, []byte(v))
+	}
+}
+
+func doGET(commport string, baudrate int, id string, cmd string) {
+	var responses string = ""
+	flds := strings.FieldsFunc(cmd, splitSemiColon)
+	for _, v := range flds {
+		v = v + ";"
+		agg_serial_com.SerialComm_Write(commport, baudrate, []byte(v))
+		data, _, err := agg_serial_com.SerialComm_Read(commport, baudrate)
+		if err == nil {
+			resp := string(data)
+			responses += resp + ";"
 		} else {
-			v = v + ";"
-			fmt.Printf("%s\n", v)
-			agg_serial_com.SerialComm_Write(commport, baudrate, []byte(v))
+			fmt.Print(err.Error())
 		}
+	}
+	savedData[id] = responses
+}
+
+func doSET(commport string, baudrate int, id string) {
+	cmd, ok := savedData[id]
+	if ok {
+		doCAT(commport, baudrate, cmd)
+	} else {
+		fmt.Printf("No saved command named:%s", id)
 	}
 }
